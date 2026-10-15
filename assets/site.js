@@ -82,7 +82,7 @@ window.addEventListener('scroll', () => {
 onScroll();
 
 /* Portrait: the accent plate drifts toward the cursor, like a print slipping out of register */
-const duotone = document.querySelector('.duotone');
+const duotone = document.querySelector('.portrait');
 if (duotone && !reduceMotion && window.matchMedia('(hover: hover)').matches) {
   duotone.addEventListener('pointermove', e => {
     const r = duotone.getBoundingClientRect();
@@ -94,5 +94,64 @@ if (duotone && !reduceMotion && window.matchMedia('(hover: hover)').matches) {
   duotone.addEventListener('pointerleave', () => {
     duotone.style.setProperty('--mx', '0px');
     duotone.style.setProperty('--my', '0px');
+  });
+}
+
+/* Background words: scattered English and Urdu, faint enough to never compete with the content */
+const bgLayer = document.querySelector('.bg-words');
+if (bgLayer) {
+  const WORDS = [
+    ['en', 'becoming'], ['ur', 'خواب'], ['en', 'code'], ['ur', 'لفظ'], ['en', 'distance'],
+    ['ur', 'سفر'], ['en', 'reckoning'], ['ur', 'امید'], ['en', 'signal'], ['ur', 'شاعری'],
+    ['en', 'grief'], ['ur', 'خاموشی'], ['en', 'build'], ['ur', 'یاد'], ['en', 'patterns'],
+    ['ur', 'روشنی'], ['en', 'curious'], ['ur', 'منزل'], ['en', 'ink'], ['ur', 'دل'],
+    ['en', 'data'], ['ur', 'وقت'], ['en', 'listen'], ['ur', 'تلاش'], ['en', 'quiet'],
+    ['ur', 'کوڈ'], ['en', 'wander'], ['ur', 'سکون']
+  ];
+  // Small deterministic generator so the layout is the same on every visit
+  let seed = 7;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  const place = () => {
+    bgLayer.textContent = '';
+    const narrow = window.innerWidth < 720;
+    const rowGap = narrow ? 300 : 340;
+    const rows = Math.max(4, Math.floor(document.documentElement.scrollHeight / rowGap));
+    const perRow = narrow ? 1 : 2;
+    seed = 7;
+    let n = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < perRow; col++) {
+        const [lang, text] = WORDS[n++ % WORDS.length];
+        const el = document.createElement('span');
+        el.className = 'bg-word ' + lang + (rand() > 0.72 ? ' tint' : '');
+        el.lang = lang === 'ur' ? 'ur' : 'en';
+        if (lang === 'ur') el.dir = 'rtl';
+        el.textContent = text;
+        const colWidth = 100 / perRow;
+        el.style.left = (col * colWidth + 3 + rand() * (narrow ? 38 : colWidth - 28)) + '%';
+        el.style.top = ((row + 0.15 + rand() * 0.6) * rowGap) + 'px';
+        const size = lang === 'ur' ? 34 + rand() * 40 : 44 + rand() * 62;
+        el.style.setProperty('--fs', (narrow ? size * 0.65 : size).toFixed(0) + 'px');
+        el.style.setProperty('--r', (rand() * 16 - 8).toFixed(1) + 'deg');
+        el.style.setProperty('--o', (0.06 + rand() * 0.04).toFixed(3));
+        el.style.setProperty('--dx', (rand() * 36 - 18).toFixed(0) + 'px');
+        el.style.setProperty('--dy', (rand() * 36 - 18).toFixed(0) + 'px');
+        el.style.setProperty('--dur', (16 + rand() * 14).toFixed(1) + 's');
+        el.style.setProperty('--delay', (rand() * 1.2 + 0.4).toFixed(2) + 's');
+        bgLayer.appendChild(el);
+      }
+    }
+  };
+
+  const fontsReady = document.fonts?.ready ?? Promise.resolve();
+  fontsReady.then(place);
+  let resizeTimer;
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;   // ignore mobile URL-bar height changes
+    lastWidth = window.innerWidth;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(place, 250);
   });
 }
