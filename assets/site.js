@@ -12,6 +12,13 @@ nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => 
   toggle?.setAttribute('aria-expanded', 'false');
 }));
 
+/* Issue line: always show the current month, like a magazine dateline */
+const issueDate = document.querySelector('.issue-date');
+if (issueDate) {
+  const month = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  issueDate.textContent = `Faisalabad, ${month}`;
+}
+
 /* Nameplate: wrap each letter so it can rise in one after another */
 const nameplate = document.querySelector('.nameplate');
 if (nameplate) {
@@ -112,12 +119,48 @@ if (bgLayer) {
   let seed = 7;
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
+  // Solid blocks a background word must never sit on, plus every actual line of text (measured below)
+  const SOLID = '.nameplate, .btn, .portrait, .ticker, .lead-feature, .certs, .writing, .book';
+  const PAD = 14; // room for the slow drift animation
+
+  // Where a box will sit once its scroll-reveal slide-in has finished
+  const settled = (rect, node) => {
+    const rev = node.closest?.('.reveal');
+    if (!rev) return rect;
+    const m = new DOMMatrixReadOnly(getComputedStyle(rev).transform);
+    return { left: rect.left - m.m41, right: rect.right - m.m41, top: rect.top - m.m42, bottom: rect.bottom - m.m42, width: rect.width, height: rect.height };
+  };
+
+  const textLineRects = () => {
+    const rects = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: node => node.textContent.trim() && !node.parentElement.closest('.bg-words, .ticker, .nameplate, script, style')
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    });
+    const range = document.createRange();
+    while (walker.nextNode()) {
+      range.selectNodeContents(walker.currentNode);
+      for (const r of range.getClientRects()) rects.push(settled(r, walker.currentNode.parentElement));
+    }
+    return rects;
+  };
+
   const place = () => {
     bgLayer.textContent = '';
     const narrow = window.innerWidth < 720;
     const rowGap = narrow ? 300 : 340;
     const rows = Math.max(4, Math.floor(document.documentElement.scrollHeight / rowGap));
     const perRow = narrow ? 1 : 2;
+    const layer = bgLayer.getBoundingClientRect();
+    const blocked = [...[...document.querySelectorAll(SOLID)].map(b => settled(b.getBoundingClientRect(), b)), ...textLineRects()]
+      .filter(r => r.width && r.height)
+      .map(r => ({ l: r.left - layer.left - PAD, t: r.top - layer.top - PAD, r: r.right - layer.left + PAD, b: r.bottom - layer.top + PAD }));
+    const clashes = el => {
+      const r = el.getBoundingClientRect();
+      const box = { l: r.left - layer.left, t: r.top - layer.top, r: r.right - layer.left, b: r.bottom - layer.top };
+      return box.r > layer.width || blocked.some(k => box.l < k.r && box.r > k.l && box.t < k.b && box.b > k.t);
+    };
+
     seed = 7;
     let n = 0;
     for (let row = 0; row < rows; row++) {
@@ -128,9 +171,6 @@ if (bgLayer) {
         el.lang = lang === 'ur' ? 'ur' : 'en';
         if (lang === 'ur') el.dir = 'rtl';
         el.textContent = text;
-        const colWidth = 100 / perRow;
-        el.style.left = (col * colWidth + 3 + rand() * (narrow ? 38 : colWidth - 28)) + '%';
-        el.style.top = ((row + 0.15 + rand() * 0.6) * rowGap) + 'px';
         const size = lang === 'ur' ? 34 + rand() * 40 : 44 + rand() * 62;
         el.style.setProperty('--fs', (narrow ? size * 0.65 : size).toFixed(0) + 'px');
         el.style.setProperty('--r', (rand() * 16 - 8).toFixed(1) + 'deg');
@@ -140,6 +180,16 @@ if (bgLayer) {
         el.style.setProperty('--dur', (16 + rand() * 14).toFixed(1) + 's');
         el.style.setProperty('--delay', (rand() * 1.2 + 0.4).toFixed(2) + 's');
         bgLayer.appendChild(el);
+
+        // Try a handful of spots in this row; keep the word only where it touches no content
+        const colWidth = 100 / perRow;
+        let free = false;
+        for (let attempt = 0; attempt < 30 && !free; attempt++) {
+          el.style.left = (col * colWidth + rand() * (colWidth - 4)) + '%';
+          el.style.top = ((row + rand() * 0.9) * rowGap) + 'px';
+          free = !clashes(el);
+        }
+        if (!free) el.remove();
       }
     }
   };

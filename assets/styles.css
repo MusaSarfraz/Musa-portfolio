@@ -30,7 +30,8 @@ main { overflow-x: clip; }
 img { max-width: 100%; display: block; }
 a { color: inherit; }
 h1, h2, h3 { font-family: var(--serif); font-weight: 500; margin: 0; line-height: 1.05; font-optical-sizing: auto; }
-p { margin: 0; }
+p { margin: 0; text-wrap: pretty; }
+h2, h3, .standfirst { text-wrap: balance; }
 ::selection { background: var(--accent); color: var(--ink); }
 
 :focus-visible { outline: 3px solid var(--accent-deep); outline-offset: 3px; }
